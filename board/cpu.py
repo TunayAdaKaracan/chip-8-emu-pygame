@@ -307,7 +307,7 @@ class Chip:
 
     def opcode_Ennn(self, opcode):
         last_bits = (opcode & 0xFF)
-        key_check = self.registers[self.decode_first(opcode)].get()
+        key_check = self.registers[self.decode_first(opcode)].get() & 0xF
         if last_bits == 0x9E:
             if self.keyboard.is_key_pressed(key_check):
                 self.pc += 2
@@ -348,7 +348,7 @@ class Chip:
             return
 
         if last_bits == 0x29:
-            self.address.set(vx.get() * 5)
+            self.address.set((vx.get() & 0xF) * 5)
             return
 
         if last_bits == 0x33:
