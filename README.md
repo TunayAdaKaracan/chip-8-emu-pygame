@@ -43,9 +43,9 @@ chip.load_rom("slipperyslope.ch8")
 
 ### Call Update Functions
 We need to call some functions in order to chip to work properly.
-These are: `Chip.tick`, `Chip.update_timers`, `Chip.keyboard.key_down`, `Chip.keyboard.key_up`
-`Chip.update_timers` must be called once every frame at 60 FPS (60Hz) before `Chip.tick`
-`Chip.tick` can be called at a custom rate
+These are: `Chip.tick`, `Chip.update_timers`, `Chip.keyboard.key_down`, `Chip.keyboard.key_up`<br>
+`Chip.update_timers` must be called once every frame at 60 FPS (60Hz) before `Chip.tick`<br>
+`Chip.tick` can be called at a custom rate<br>
 `Chip.keyboard.key_down` and `Chip.keyboard.key_up` needs to be managed by developer as it might change depending on what framework/library you are using
 
 ### Render Display
