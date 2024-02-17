@@ -17,18 +17,14 @@ DEFAULT_KEYBINDINGS = {
     118: 0xF  # V
 }
 
-PACMAN = DEFAULT_KEYBINDINGS.copy()
-PACMAN[119] = 0x3
-PACMAN[115] = 0x6
-PACMAN[100] = 0x8
-
 
 class VirtualKeyboard:
     def __init__(self, key_bindings=None):
-        self.KEYMAP = key_bindings or PACMAN
+        self.KEYMAP = key_bindings or DEFAULT_KEYBINDINGS
 
         self.keys_pressed = []
 
+        self.key_press_for_event = None
         self.key_press_event = None
 
     def is_key_pressed(self, key):
@@ -38,11 +34,14 @@ class VirtualKeyboard:
         if key not in self.KEYMAP:
             return
         self.keys_pressed.append(self.KEYMAP[key])
-        if self.key_press_event:
-            self.key_press_event(self.KEYMAP[key])
-            self.key_press_event = None
+        if self.key_press_event and not self.key_press_for_event:
+            self.key_press_for_event = key
 
     def key_up(self, key):
         if key not in self.KEYMAP:
             return
+        if self.key_press_for_event and self.key_press_event:
+            self.key_press_event(self.KEYMAP[self.key_press_for_event])
+            self.key_press_event = None
+            self.key_press_for_event = None
         self.keys_pressed.remove(self.KEYMAP[key])

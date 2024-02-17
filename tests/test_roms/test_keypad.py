@@ -21,9 +21,9 @@ def render_display(chip, screen: pygame.Surface):
 
 # Emu loop
 def main():
-    chip = Chip(scale, False, 40)
+    chip = Chip(scale, False, 40, False)
     chip.load_sprites_to_mem()
-    chip.load_rom("slipperyslope.ch8")
+    chip.load_rom("6-keypad.ch8", "../../rom/tests/")
     clock = pygame.time.Clock()
     while True:
         clock.tick(60)

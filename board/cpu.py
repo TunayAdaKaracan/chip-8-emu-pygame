@@ -25,10 +25,11 @@ sprites = [
 
 
 class Chip:
-    def __init__(self, screen_scale=1, start_paused=False, speed=10):
+    def __init__(self, screen_scale=1, start_paused=False, speed=10, schip=False, **kwargs):
         self.screen = Screen(screen_scale)
         self.keyboard = VirtualKeyboard()
         self.mem = VirtualMemory()
+        self.stack_size = kwargs.get("stack_size", 24)
 
         self.registers = [Register() for _ in range(16)]
 
@@ -66,6 +67,9 @@ class Chip:
         }
 
         self.last_instructions = []
+
+        # configuration
+        self.schip_mode = schip
 
     def load_sprites_to_mem(self):
         for i, v in enumerate(sprites):
@@ -136,6 +140,8 @@ class Chip:
         if opcode == 0x00E0:
             return self.screen.clear()
         if opcode == 0x00EE:
+            if len(self.stack) == 0:
+                raise RuntimeError("Bad ROM: Trying to pop from stack which is empty")
             self.pc = self.stack.pop()
 
     # JMP addr/imm
@@ -149,6 +155,8 @@ class Chip:
     # Saves program counter to stack and jumps to a new addr
     def opcode_2nnn(self, opcode):
         self.stack.append(self.pc)
+        if len(self.stack) > self.stack_size:  # Force limit to stack size
+            raise RuntimeError("BAD ROM: Stack Overflow.")
         self.pc = (opcode & 0xFFF)
 
     # COMP Vx imm
@@ -169,6 +177,8 @@ class Chip:
     # 5xy0
     # Compares register x to register y. Jump 1 instruction if eq
     def opcode_5nnn(self, opcode):
+        if (opcode & 0xF) != 0:
+            return
         if self.registers[self.decode_first(opcode)].get() == self.registers[self.decode_second(opcode)].get():
             self.pc += 2
 
@@ -206,40 +216,52 @@ class Chip:
             return
 
         if last_bits == 0x4:
-            sums = vx.get() + vy.get()
-
-            self.registers[0xF].set(0)
+            sums = int(vx.get()) + int(vy.get())
+            tmp = 0
             if sums > 0xFF:
-                self.registers[0xF].set(1)
+                tmp = 1
+
             vx.set(sums)
+            self.registers[0xF].set(tmp)
             return
 
         if last_bits == 0x5:
-            self.registers[0xF].set(0)
-            if vx.get() > vy.get():
-                self.registers[0xF].set(1)
+            tmp = 0
+            if vx.get() >= vy.get():
+                tmp = 1
 
             vx.set(vx.get() - vy.get())
+            self.registers[0xF].set(tmp)
             return
 
         if last_bits == 0x6:
-            self.registers[0xF].set(vx.get() & 0x1)
+            if self.schip_mode:
+                vx.set(vy.get())
+            tmp = vx.get() & 0x1
             vx.set(vx.get() >> 1)
+            self.registers[0xF].set(tmp)
             return
 
         if last_bits == 0x7:
-            self.registers[0xF].set(0)
-            if vy.get() > vx.get():
-                self.registers[0xF].set(1)
+            tmp = 0
+            if vy.get() >= vx.get():
+                tmp = 1
             vx.set(vy.get() - vx.get())
+            self.registers[0xF].set(tmp)
             return
 
+        # CARRY: Fails 2, 3
         if last_bits == 0xE:
-            self.registers[0xF].set(vx.get() & 0x80)
-            vx.set(vx.get() << 1)
+            if self.schip_mode:
+                vx.set(vy.get())
+            tmp = (vx.get() & 0x80) >> 7
+            vx.set((vx.get() << 1))
+            self.registers[0xF].set(tmp)
             return
 
     def opcode_9nnn(self, opcode):
+        if (opcode & 0xF) != 0:
+            return
         if self.registers[self.decode_first(opcode)].get() != self.registers[self.decode_second(opcode)].get():
             self.pc += 2
 
@@ -247,7 +269,7 @@ class Chip:
         self.address.set(opcode & 0xFFF)
 
     def opcode_Bnnn(self, opcode):
-        self.pc = self.registers[0].get() + (opcode & 0xFFF)
+        self.pc = self.registers[self.decode_first(opcode)].get() + (opcode & 0xFFF)
 
     def opcode_Cnnn(self, opcode):
         rand = random.randint(0, 0xFF)
@@ -261,24 +283,38 @@ class Chip:
         self.registers[0xF].set(0)
 
         for row in range(height):
+            y_position = vy.get() + row
+            y_position %= 32
+
             sprite = self.mem.get(self.address.get() + row)
 
             for col in range(width):
+                x_position = vx.get() + col
+                x_position %= 64
+
+                if x_position >= self.screen.cols:
+                    break
+
                 if (sprite & 0x80) > 0:
-                    if self.screen.set_pixel(vx.get() + col, vy.get() + row):
+                    if self.screen.set_pixel(x_position, y_position):
                         self.registers[0xF].set(1)
+
                 sprite <<= 1
+
+            if y_position >= self.screen.rows:
+                break
+
 
     def opcode_Ennn(self, opcode):
         last_bits = (opcode & 0xFF)
+        key_check = self.registers[self.decode_first(opcode)].get()
         if last_bits == 0x9E:
-            key_check = self.registers[self.decode_first(opcode)].get()
             if self.keyboard.is_key_pressed(key_check):
                 self.pc += 2
             return
 
         if last_bits == 0xA1:
-            if not self.keyboard.is_key_pressed(self.registers[self.decode_first(opcode)].get()):
+            if not self.keyboard.is_key_pressed(key_check):
                 self.pc += 2
 
     def opcode_Fnnn(self, opcode):

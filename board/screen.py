@@ -8,18 +8,8 @@ class Screen:
         self.display = [0] * self.cols * self.rows
 
     def set_pixel(self, x, y):
-        if x > self.cols:
-            x -= self.cols
-        elif x < 0:
-            x += self.cols
-
-        if y > self.rows:
-            y -= self.rows
-        elif y < 0:
-            y += self.rows
-
         pixel_loc = x + (y * self.cols)
-        self.display[pixel_loc] ^= 1  # b0000 0001
+        self.display[pixel_loc] ^= 1
         return not self.display[pixel_loc]
 
     def clear(self):
